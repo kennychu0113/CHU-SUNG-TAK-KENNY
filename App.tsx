@@ -8,12 +8,15 @@ import ExpenseTable from './components/ExpenseTable';
 import AddEntryForm from './components/AddEntryForm';
 import AddExpenseForm from './components/AddExpenseForm';
 import SettingsForm from './components/SettingsForm';
-import { LayoutDashboard, List, CreditCard, Menu, X, Plus, Settings } from 'lucide-react';
+import IncomeHistory from './components/IncomeHistory';
+import MetricHistory from './components/MetricHistory';
+import { LayoutDashboard, List, CreditCard, Menu, X, Plus, Settings, CheckCircle2 } from 'lucide-react';
 
 const STORAGE_KEYS = {
   ASSETS: 'wealthtrack_assets',
   EXPENSES: 'wealthtrack_expenses',
-  SETTINGS: 'wealthtrack_settings'
+  SETTINGS: 'wealthtrack_settings',
+  LAST_SAVED: 'wealthtrack_last_saved'
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -60,22 +63,39 @@ const App: React.FC = () => {
     }
   });
 
+  const [lastSaved, setLastSaved] = useState<Date | null>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.LAST_SAVED);
+    return stored ? new Date(stored) : null;
+  });
+
   const [view, setView] = useState<ViewState>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<FinanceRecord | null>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
+  
+  // State for generic metric history
+  const [metricConfig, setMetricConfig] = useState<{key: string, title: string, color: string} | null>(null);
 
   // Persistence Effects
+  const updateLastSaved = () => {
+    const now = new Date();
+    setLastSaved(now);
+    localStorage.setItem(STORAGE_KEYS.LAST_SAVED, now.toISOString());
+  };
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(data));
+    updateLastSaved();
   }, [data]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+    updateLastSaved();
   }, [expenses]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    updateLastSaved();
   }, [settings]);
 
   const handleAddOrUpdateRecord = (record: FinanceRecord) => {
@@ -129,6 +149,11 @@ const App: React.FC = () => {
     alert('Settings saved successfully!');
   };
 
+  const handleViewMetric = (key: string, title: string, color: string) => {
+    setMetricConfig({ key, title, color });
+    setView('metric_history');
+  };
+
   const NavItem = ({ id, label, icon }: { id: ViewState, label: string, icon: React.ReactNode }) => (
     <button
       onClick={() => {
@@ -137,6 +162,7 @@ const App: React.FC = () => {
         // Reset edit states when navigating via menu
         setEditingAsset(null);
         setEditingExpense(null);
+        setMetricConfig(null);
       }}
       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all w-full md:w-auto ${
         (view === id || (view.startsWith('add_') && id === view.replace('add_', '') + 's' as any)) // keep parent active
@@ -161,11 +187,23 @@ const App: React.FC = () => {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-white pt-20 px-4 space-y-2">
+        <div className="md:hidden fixed inset-0 z-40 bg-white pt-20 px-4 space-y-2 flex flex-col">
             <NavItem id="dashboard" label="Dashboard" icon={<LayoutDashboard size={20} />} />
             <NavItem id="assets" label="Assets" icon={<List size={20} />} />
             <NavItem id="expenses" label="Expenses" icon={<CreditCard size={20} />} />
             <NavItem id="settings" label="Settings" icon={<Settings size={20} />} />
+            
+            <div className="mt-auto mb-8 px-4 py-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                    <CheckCircle2 size={16} />
+                    <span className="text-xs font-semibold uppercase tracking-wider">Auto-Saved</span>
+                </div>
+                 {lastSaved && (
+                    <p className="text-xs text-slate-400">
+                        {lastSaved.toLocaleDateString()} {lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </p>
+                )}
+            </div>
         </div>
       )}
 
@@ -182,8 +220,20 @@ const App: React.FC = () => {
             <NavItem id="expenses" label="Expenses" icon={<CreditCard size={20} />} />
             <NavItem id="settings" label="Settings" icon={<Settings size={20} />} />
           </nav>
-          <div className="text-xs text-slate-400 mt-auto pt-6 border-t border-slate-100">
-             v1.3.0 &copy; 2025
+          
+          <div className="mt-auto pt-6 border-t border-slate-100">
+            <div className="flex items-center gap-2 mb-2">
+                <div className={`w-2 h-2 rounded-full ${lastSaved ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`}></div>
+                <span className="text-xs font-medium text-slate-500">Device Storage Active</span>
+            </div>
+             {lastSaved && (
+                <p className="text-[10px] text-slate-400 pl-4">
+                    Saved: {lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </p>
+            )}
+             <div className="text-[10px] text-slate-300 mt-4">
+                v1.6.0 &copy; 2025
+            </div>
           </div>
         </aside>
 
@@ -194,13 +244,41 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-bold text-slate-800 capitalize">
                     {view === 'add_asset' ? (editingAsset ? 'Edit Asset Record' : 'Add Asset Record') : 
                      view === 'add_expense' ? (editingExpense ? 'Edit Expense' : 'Log Expense') : 
+                     view === 'income_history' ? 'Income Analysis' :
+                     view === 'metric_history' ? (metricConfig?.title || 'History') :
                      view}
                 </h2>
                 <p className="text-slate-500 text-sm">Manage your financial growth</p>
             </header>
 
-            {view === 'dashboard' && <Dashboard data={data} expenses={expenses} settings={settings} />}
+            {view === 'dashboard' && (
+                <Dashboard 
+                    data={data} 
+                    expenses={expenses} 
+                    settings={settings}
+                    onViewIncome={() => setView('income_history')}
+                    onViewExpenses={() => setView('expenses')}
+                    onViewMetric={handleViewMetric}
+                />
+            )}
             
+            {view === 'income_history' && (
+                <IncomeHistory 
+                    data={data}
+                    onBack={() => setView('dashboard')}
+                />
+            )}
+
+            {view === 'metric_history' && metricConfig && (
+                <MetricHistory 
+                    data={data}
+                    title={metricConfig.title}
+                    dataKey={metricConfig.key}
+                    color={metricConfig.color}
+                    onBack={() => setView('dashboard')}
+                />
+            )}
+
             {view === 'assets' && (
                 <div className="space-y-4">
                      <div className="flex justify-end">
@@ -260,7 +338,12 @@ const App: React.FC = () => {
             )}
 
             {view === 'settings' && (
-                <SettingsForm settings={settings} onSave={handleSaveSettings} />
+                <SettingsForm 
+                    settings={settings} 
+                    onSave={handleSaveSettings} 
+                    data={data}
+                    expenses={expenses}
+                />
             )}
           </div>
         </main>

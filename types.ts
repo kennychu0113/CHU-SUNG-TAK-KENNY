@@ -40,4 +40,4 @@ export interface AppSettings {
   }
 }
 
-export type ViewState = 'dashboard' | 'assets' | 'expenses' | 'add_asset' | 'add_expense' | 'settings';
+export type ViewState = 'dashboard' | 'assets' | 'expenses' | 'add_asset' | 'add_expense' | 'settings' | 'income_history' | 'metric_history';

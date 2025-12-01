@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { AppSettings } from '../types';
-import { Save, RefreshCw } from 'lucide-react';
+import { AppSettings, FinanceRecord, ExpenseRecord } from '../types';
+import { Save, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { downloadCSV } from '../utils/helpers';
 
 interface SettingsFormProps {
   settings: AppSettings;
   onSave: (settings: AppSettings) => void;
+  data: FinanceRecord[];
+  expenses: ExpenseRecord[];
 }
 
-const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave }) => {
+const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, expenses }) => {
   const [labels, setLabels] = useState(settings.labels);
 
   const handleChange = (key: keyof AppSettings['labels'], value: string) => {
@@ -32,8 +35,55 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave }) => {
     onSave({ labels });
   };
 
+  const handleExportAssets = () => {
+    // Reconstruct CSV format compatible with the import structure
+    const header = `Date,Total Assets,Gain,Income,Cash Total,${labels.hsbc},${labels.citi},${labels.other},Inv Total,${labels.sofi},${labels.binance},${labels.yen},MPF`;
+    const rows = data.map(r => {
+        return `${r.date},${r.totalAssets},${r.gain},${r.income},${r.cash.total},${r.cash.hsbc},${r.cash.citi},${r.cash.other},${r.investment.total},${r.investment.sofi},${r.investment.binance},${r.yen},${r.mpf}`;
+    });
+    const csvContent = [header, ...rows].join('\n');
+    downloadCSV(csvContent, `WealthTrack_Assets_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportExpenses = () => {
+    const header = `Date,Category,Item,Amount,Note`;
+    const rows = expenses.map(e => `${e.date},${e.category},"${e.item}",${e.amount},"${e.note || ''}"`);
+    const csvContent = [header, ...rows].join('\n');
+    downloadCSV(csvContent, `WealthTrack_Expenses_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
   return (
-    <div className="max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-300">
+    <div className="max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-300 space-y-8">
+      
+      {/* Export Section */}
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-slate-100">
+         <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <Download size={24} className="text-emerald-600" />
+            Data Management
+         </h2>
+         <p className="text-sm text-slate-500 mb-6">Export your data to CSV format. You can upload these files to Google Drive or open them in Excel.</p>
+         
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+                onClick={handleExportAssets}
+                className="flex flex-col items-center justify-center p-6 border-2 border-slate-100 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group"
+            >
+                <FileSpreadsheet size={32} className="text-slate-400 group-hover:text-emerald-600 mb-2 transition-colors" />
+                <span className="font-semibold text-slate-700 group-hover:text-emerald-800">Export Assets CSV</span>
+                <span className="text-xs text-slate-400 mt-1">Full record history</span>
+            </button>
+             <button 
+                onClick={handleExportExpenses}
+                className="flex flex-col items-center justify-center p-6 border-2 border-slate-100 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group"
+            >
+                <FileSpreadsheet size={32} className="text-slate-400 group-hover:text-rose-600 mb-2 transition-colors" />
+                <span className="font-semibold text-slate-700 group-hover:text-rose-800">Export Expenses CSV</span>
+                <span className="text-xs text-slate-400 mt-1">All expense transactions</span>
+            </button>
+         </div>
+      </div>
+
+      {/* Settings Section */}
       <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-slate-100">
         <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
           <div>
@@ -46,7 +96,6 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-emerald-700 uppercase tracking-wide bg-emerald-50 p-2 rounded-lg">Cash Accounts</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

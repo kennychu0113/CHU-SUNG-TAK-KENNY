@@ -2,19 +2,41 @@ import React from 'react';
 import { FinanceRecord, ExpenseRecord, AppSettings } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { formatCurrency } from '../utils/helpers';
-import { TrendingUp, DollarSign, Wallet, PieChart, CreditCard, PiggyBank } from 'lucide-react';
+import { TrendingUp, DollarSign, Wallet, PieChart, CreditCard, PiggyBank, ArrowRight } from 'lucide-react';
 
 interface DashboardProps {
   data: FinanceRecord[];
   expenses: ExpenseRecord[];
   settings: AppSettings;
+  onViewIncome: () => void;
+  onViewExpenses: () => void;
+  onViewMetric: (key: string, title: string, color: string) => void;
 }
 
-const StatCard = ({ title, value, subtext, icon, trend, color }: { title: string, value: string, subtext?: string, icon: React.ReactNode, trend?: 'up' | 'down' | 'neutral', color?: string }) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-start justify-between">
+const StatCard = ({ 
+    title, 
+    value, 
+    subtext, 
+    icon, 
+    trend, 
+    color, 
+    onClick 
+}: { 
+    title: string, 
+    value: string, 
+    subtext?: string, 
+    icon: React.ReactNode, 
+    trend?: 'up' | 'down' | 'neutral', 
+    color?: string,
+    onClick?: () => void
+}) => (
+  <div 
+    onClick={onClick}
+    className={`bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-start justify-between transition-all ${onClick ? 'cursor-pointer hover:shadow-md hover:border-emerald-200 group' : ''}`}
+  >
     <div>
       <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+      <h3 className="text-2xl font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">{value}</h3>
       {subtext && <p className={`text-xs mt-1 ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-rose-600' : 'text-slate-400'}`}>{subtext}</p>}
     </div>
     <div className={`p-3 rounded-lg ${color || (trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600')}`}>
@@ -23,12 +45,18 @@ const StatCard = ({ title, value, subtext, icon, trend, color }: { title: string
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewIncome, onViewExpenses, onViewMetric }) => {
   const latest = data[data.length - 1] || {} as FinanceRecord;
   const previous = data[data.length - 2];
   
   const gainSinceLast = latest.totalAssets - (previous?.totalAssets || latest.totalAssets);
   const gainPercent = previous?.totalAssets ? (gainSinceLast / previous.totalAssets) * 100 : 0;
+
+  // Calculate Average Monthly Income
+  // Filter out records with 0 or missing income to get a true "working" average
+  const incomeRecords = data.filter(r => r.income && r.income > 0);
+  const totalIncome = incomeRecords.reduce((sum, r) => sum + r.income, 0);
+  const avgIncome = incomeRecords.length > 0 ? totalIncome / incomeRecords.length : 0;
 
   // Calculate total expenses (simple sum for now, realistically should be monthly)
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -64,26 +92,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings }) => {
           subtext={`${gainPercent > 0 ? '+' : ''}${gainPercent.toFixed(1)}% since last entry`}
           trend={gainPercent >= 0 ? 'up' : 'down'}
           icon={<TrendingUp size={20} />}
+          onClick={() => onViewMetric('totalAssets', 'Net Worth History', '#10b981')}
         />
         <StatCard 
-          title="Monthly Income" 
-          value={formatCurrency(latest.income || 0)} 
-          subtext="Latest recorded"
+          title="Avg. Monthly Income" 
+          value={formatCurrency(avgIncome)} 
+          subtext={`Based on ${incomeRecords.length} records. Click for history.`}
           icon={<DollarSign size={20} />}
           color="bg-emerald-50 text-emerald-600"
+          onClick={onViewIncome}
         />
         <StatCard 
             title="Monthly Expenses" 
             value={formatCurrency(monthlyExpenses)} 
-            subtext="Estimated from expense list"
+            subtext="Click for details"
             icon={<CreditCard size={20} />}
             color="bg-rose-50 text-rose-600"
             trend="down"
+            onClick={onViewExpenses}
         />
         <StatCard 
           title="Net Savings" 
           value={formatCurrency(netSavings)} 
-          subtext="Income - Expenses"
+          subtext="Latest Income - Expenses"
           icon={<PiggyBank size={20} />}
           color="bg-blue-50 text-blue-600"
         />
@@ -92,12 +123,14 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings }) => {
           value={formatCurrency(latest.cash?.total || 0)} 
           subtext="Liquid Assets"
           icon={<Wallet size={20} />}
+          onClick={() => onViewMetric('cash.total', 'Cash Holdings History', '#3b82f6')}
         />
         <StatCard 
           title="Investments" 
           value={formatCurrency(latest.investment?.total || 0)} 
           subtext={`${settings.labels.sofi} & ${settings.labels.binance}`}
           icon={<PieChart size={20} />}
+          onClick={() => onViewMetric('investment.total', 'Investment History', '#6366f1')}
         />
       </div>
 
