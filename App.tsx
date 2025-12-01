@@ -10,35 +10,73 @@ import AddExpenseForm from './components/AddExpenseForm';
 import SettingsForm from './components/SettingsForm';
 import { LayoutDashboard, List, CreditCard, Menu, X, Plus, Settings } from 'lucide-react';
 
+const STORAGE_KEYS = {
+  ASSETS: 'wealthtrack_assets',
+  EXPENSES: 'wealthtrack_expenses',
+  SETTINGS: 'wealthtrack_settings'
+};
+
+const DEFAULT_SETTINGS: AppSettings = {
+  labels: {
+      hsbc: 'HSBC',
+      citi: 'Citi',
+      other: 'Other',
+      sofi: 'Sofi',
+      binance: 'Binance',
+      yen: 'Yen'
+  }
+};
+
 const App: React.FC = () => {
-  const [data, setData] = useState<FinanceRecord[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
-  const [view, setView] = useState<ViewState>('dashboard');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // Settings State
-  const [settings, setSettings] = useState<AppSettings>({
-    labels: {
-        hsbc: 'HSBC',
-        citi: 'Citi',
-        other: 'Other',
-        sofi: 'Sofi',
-        binance: 'Binance',
-        yen: 'Yen'
+  // Initialize Assets with Local Storage or Default CSV
+  const [data, setData] = useState<FinanceRecord[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ASSETS);
+      return stored ? JSON.parse(stored) : parseCSVData(INITIAL_CSV_DATA);
+    } catch (e) {
+      console.error("Failed to load assets from storage", e);
+      return parseCSVData(INITIAL_CSV_DATA);
     }
   });
 
-  // Edit State
+  // Initialize Expenses with Local Storage or Default CSV
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.EXPENSES);
+      return stored ? JSON.parse(stored) : parseExpenseCSV(INITIAL_EXPENSE_DATA);
+    } catch (e) {
+      console.error("Failed to load expenses from storage", e);
+      return parseExpenseCSV(INITIAL_EXPENSE_DATA);
+    }
+  });
+  
+  // Initialize Settings with Local Storage or Default
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+    } catch (e) {
+      return DEFAULT_SETTINGS;
+    }
+  });
+
+  const [view, setView] = useState<ViewState>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<FinanceRecord | null>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
 
+  // Persistence Effects
   useEffect(() => {
-    // Load initial data
-    const records = parseCSVData(INITIAL_CSV_DATA);
-    const expenseRecords = parseExpenseCSV(INITIAL_EXPENSE_DATA);
-    setData(records);
-    setExpenses(expenseRecords);
-  }, []);
+    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(data));
+  }, [data]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+  }, [expenses]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+  }, [settings]);
 
   const handleAddOrUpdateRecord = (record: FinanceRecord) => {
     setData(prev => {
@@ -145,7 +183,7 @@ const App: React.FC = () => {
             <NavItem id="settings" label="Settings" icon={<Settings size={20} />} />
           </nav>
           <div className="text-xs text-slate-400 mt-auto pt-6 border-t border-slate-100">
-             v1.2.0 &copy; 2025
+             v1.3.0 &copy; 2025
           </div>
         </aside>
 
