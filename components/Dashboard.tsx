@@ -1,46 +1,63 @@
 import React from 'react';
-import { FinanceRecord } from '../types';
+import { FinanceRecord, ExpenseRecord, AppSettings } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { formatCurrency } from '../utils/helpers';
-import { TrendingUp, TrendingDown, DollarSign, Wallet, PieChart } from 'lucide-react';
+import { TrendingUp, DollarSign, Wallet, PieChart, CreditCard, PiggyBank } from 'lucide-react';
 
 interface DashboardProps {
   data: FinanceRecord[];
+  expenses: ExpenseRecord[];
+  settings: AppSettings;
 }
 
-const StatCard = ({ title, value, subtext, icon, trend }: { title: string, value: string, subtext?: string, icon: React.ReactNode, trend?: 'up' | 'down' | 'neutral' }) => (
+const StatCard = ({ title, value, subtext, icon, trend, color }: { title: string, value: string, subtext?: string, icon: React.ReactNode, trend?: 'up' | 'down' | 'neutral', color?: string }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-start justify-between">
     <div>
       <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
       <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
       {subtext && <p className={`text-xs mt-1 ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-rose-600' : 'text-slate-400'}`}>{subtext}</p>}
     </div>
-    <div className={`p-3 rounded-lg ${trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'}`}>
+    <div className={`p-3 rounded-lg ${color || (trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600')}`}>
       {icon}
     </div>
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ data }) => {
-  // Use the latest record for summary
+const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings }) => {
   const latest = data[data.length - 1] || {} as FinanceRecord;
   const previous = data[data.length - 2];
   
   const gainSinceLast = latest.totalAssets - (previous?.totalAssets || latest.totalAssets);
   const gainPercent = previous?.totalAssets ? (gainSinceLast / previous.totalAssets) * 100 : 0;
 
+  // Calculate total expenses (simple sum for now, realistically should be monthly)
+  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  
+  // Calculate expenses for the current month of the latest record
+  const currentMonth = new Date(latest.date).getMonth();
+  const currentYear = new Date(latest.date).getFullYear();
+  
+  const monthlyExpenses = expenses
+    .filter(e => {
+        const d = new Date(e.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    })
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const netSavings = (latest.income || 0) - monthlyExpenses;
+
   const chartData = data.map(d => ({
     name: d.date === 'Unknown Date' ? 'Latest' : d.date.split('/')[1] + '/' + d.date.split('/')[2], // MM/DD
     Total: d.totalAssets,
     Cash: d.cash.total,
     Investment: d.investment.total,
-    Yen: d.yen,
+    [settings.labels.yen]: d.yen, // Use dynamic label
     MPF: d.mpf
   }));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard 
           title="Total Net Worth" 
           value={formatCurrency(latest.totalAssets)} 
@@ -49,6 +66,28 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           icon={<TrendingUp size={20} />}
         />
         <StatCard 
+          title="Monthly Income" 
+          value={formatCurrency(latest.income || 0)} 
+          subtext="Latest recorded"
+          icon={<DollarSign size={20} />}
+          color="bg-emerald-50 text-emerald-600"
+        />
+        <StatCard 
+            title="Monthly Expenses" 
+            value={formatCurrency(monthlyExpenses)} 
+            subtext="Estimated from expense list"
+            icon={<CreditCard size={20} />}
+            color="bg-rose-50 text-rose-600"
+            trend="down"
+        />
+        <StatCard 
+          title="Net Savings" 
+          value={formatCurrency(netSavings)} 
+          subtext="Income - Expenses"
+          icon={<PiggyBank size={20} />}
+          color="bg-blue-50 text-blue-600"
+        />
+         <StatCard 
           title="Cash Holdings" 
           value={formatCurrency(latest.cash?.total || 0)} 
           subtext="Liquid Assets"
@@ -57,14 +96,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         <StatCard 
           title="Investments" 
           value={formatCurrency(latest.investment?.total || 0)} 
-          subtext="Sofi & Binance"
+          subtext={`${settings.labels.sofi} & ${settings.labels.binance}`}
           icon={<PieChart size={20} />}
-        />
-        <StatCard 
-          title="Monthly Income" 
-          value={formatCurrency(latest.income || 0)} 
-          subtext="Latest recorded"
-          icon={<DollarSign size={20} />}
         />
       </div>
 
@@ -106,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
               <Legend iconType="circle" />
               <Bar dataKey="Cash" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
               <Bar dataKey="Investment" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Yen" stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={settings.labels.yen} stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

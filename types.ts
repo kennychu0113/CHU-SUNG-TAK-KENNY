@@ -20,4 +20,24 @@ export interface FinanceRecord {
   note?: string;
 }
 
-export type ViewState = 'dashboard' | 'list' | 'add' | 'ai';
+export interface ExpenseRecord {
+  id: string;
+  date: string;
+  category: string;
+  item: string;
+  amount: number;
+  note?: string;
+}
+
+export interface AppSettings {
+  labels: {
+    hsbc: string;
+    citi: string;
+    other: string;
+    sofi: string;
+    binance: string;
+    yen: string;
+  }
+}
+
+export type ViewState = 'dashboard' | 'assets' | 'expenses' | 'add_asset' | 'add_expense' | 'settings';

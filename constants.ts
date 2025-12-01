@@ -6,3 +6,16 @@ export const INITIAL_CSV_DATA = `紀錄日期,Cash,HSBC,CITI,Other,Investment,So
 2025/10/3,"$82,844","$36,400","$42,995","$3,449","$98,300","$86,200","$12,100","$1,492","$182,636","-$2,918.00","$22,806.00",$68860,
 2025/11/4,"$79,547","$27,491","$46,058","$5,998","$102,006","$91,909","$10,097","$1,411","$182,964",$328.05,"$22,895.00","$74,406",
 ,"$92,503","$57,200","$31,103","$4,200","$101,140","$92,590","$8,550","$1,390","$195,033","$12,068.95","$25,830.00","$76,214",`;
+
+// Paste your Excel Expense sheet data here (CSV format)
+// Format: Date, Category, Item, Amount, Note
+export const INITIAL_EXPENSE_DATA = `Date,Category,Item,Amount,Note
+2025/10/01,Food,Lunch with colleagues,120,Team lunch
+2025/10/05,Transport,Monthly MTR Pass,480,
+2025/10/08,Shopping,Uniqlo,350,Winter clothes
+2025/10/12,Food,Groceries,450,Weekly stock
+2025/10/15,Utilities,Phone Bill,188,
+2025/10/20,Entertainment,Movie tickets,240,
+2025/10/25,Food,Dinner,300,
+2025/11/01,Rent,Monthly Rent,8500,
+2025/11/02,Transport,Taxi,85,Late night`;

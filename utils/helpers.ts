@@ -1,4 +1,4 @@
-import { FinanceRecord } from '../types';
+import { FinanceRecord, ExpenseRecord } from '../types';
 
 export const parseCurrency = (val: string | number | undefined | null): number => {
   if (!val) return 0;
@@ -33,12 +33,6 @@ export const parseCSVData = (csv: string): FinanceRecord[] => {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Simple CSV split handling quoted strings with commas
-    const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-    // Fallback if regex fails or simple split is needed (the regex above is basic)
-    // For this specific dataset which is uniform, we can try a simpler approach if matches is null
-    // But let's do a robust simple parse:
-    
     let parts: string[] = [];
     let current = '';
     let inQuote = false;
@@ -54,26 +48,19 @@ export const parseCSVData = (csv: string): FinanceRecord[] => {
     }
     parts.push(current);
 
-    // Filter out completely empty rows (like ,$0,,,,$0,,,,) which have lots of empty fields but 0s
-    const hasMeaningfulData = parts.some((p, idx) => idx > 0 && parseCurrency(p) > 100); 
-    if (!hasMeaningfulData && !parts[0]) continue;
-
-    // Mapping based on user's column order:
-    // 0: Date, 1: CashTotal, 2: HSBC, 3: CITI, 4: Other, 
-    // 5: InvTotal, 6: Sofi, 7: Binance, 8: Yen, 
-    // 9: Total, 10: Gain, 11: Income, 12: MPF, 13: Notes/Goal
-    
-    // Clean quotes
     const cleanParts = parts.map(p => p ? p.replace(/^"|"$/g, '').trim() : '');
+
+    // Basic validation to check if row has data
+    if (!cleanParts[0] && parseCurrency(cleanParts[9]) === 0) continue;
 
     const record: FinanceRecord = {
       id: `rec-${i}-${Date.now()}`,
-      date: cleanParts[0] || 'Unknown Date', // Handle missing date in row 7
+      date: cleanParts[0] || 'Unknown Date',
       cash: {
         hsbc: parseCurrency(cleanParts[2]),
         citi: parseCurrency(cleanParts[3]),
         other: parseCurrency(cleanParts[4]),
-        total: parseCurrency(cleanParts[1]), // Or sum manually if preferred
+        total: parseCurrency(cleanParts[1]), 
       },
       investment: {
         sofi: parseCurrency(cleanParts[6]),
@@ -89,6 +76,31 @@ export const parseCSVData = (csv: string): FinanceRecord[] => {
     };
     
     records.push(record);
+  }
+  return records;
+};
+
+export const parseExpenseCSV = (csv: string): ExpenseRecord[] => {
+  const lines = csv.split('\n');
+  const records: ExpenseRecord[] = [];
+  
+  // Skip header
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const parts = line.split(',').map(p => p.trim());
+    if (parts.length < 3) continue;
+
+    // Expected: Date, Category, Item, Amount, Note
+    records.push({
+      id: `exp-${i}-${Date.now()}`,
+      date: parts[0],
+      category: parts[1] || 'Uncategorized',
+      item: parts[2] || 'Expense',
+      amount: parseCurrency(parts[3]),
+      note: parts[4] || ''
+    });
   }
   return records;
 };
