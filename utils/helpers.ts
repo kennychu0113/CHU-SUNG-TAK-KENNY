@@ -8,7 +8,10 @@ export const parseCurrency = (val: string | number | undefined | null): number =
   return isNaN(float) ? 0 : float;
 };
 
-export const formatCurrency = (val: number): string => {
+export const formatCurrency = (val: number | undefined | null): string => {
+  if (val === undefined || val === null || isNaN(val)) {
+    return '$0';
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD', // Assuming $ symbol implies dollar (HKD/USD), using generic $ formatting

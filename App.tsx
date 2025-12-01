@@ -57,7 +57,16 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+      if (stored) {
+          const parsed = JSON.parse(stored);
+          // Deep merge to ensure all keys exist (prevents crash if new keys are added)
+          return {
+              ...DEFAULT_SETTINGS,
+              ...parsed,
+              labels: { ...DEFAULT_SETTINGS.labels, ...parsed.labels }
+          };
+      }
+      return DEFAULT_SETTINGS;
     } catch (e) {
       return DEFAULT_SETTINGS;
     }

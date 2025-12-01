@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppSettings, FinanceRecord, ExpenseRecord } from '../types';
-import { Save, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { Save, RefreshCw, Download, FileSpreadsheet, Trash2, AlertTriangle } from 'lucide-react';
 import { downloadCSV } from '../utils/helpers';
 
 interface SettingsFormProps {
@@ -17,7 +17,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
     setLabels(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleReset = () => {
+  const handleResetLabels = () => {
     if (window.confirm('Reset all labels to default?')) {
         setLabels({
             hsbc: 'HSBC',
@@ -28,6 +28,13 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
             yen: 'Yen'
         });
     }
+  };
+
+  const handleClearAllData = () => {
+      if (window.confirm('Are you absolutely sure? This will delete ALL your assets and expenses history. This action cannot be undone.')) {
+          localStorage.clear();
+          window.location.reload();
+      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -53,7 +60,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
   };
 
   return (
-    <div className="max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-300 space-y-8">
+    <div className="max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-300 space-y-8 pb-12">
       
       {/* Export Section */}
       <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-slate-100">
@@ -90,7 +97,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
             <h2 className="text-xl font-bold text-slate-800">Column Settings</h2>
             <p className="text-sm text-slate-500">Customize the names of your asset accounts.</p>
           </div>
-          <button onClick={handleReset} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full" title="Reset Defaults">
+          <button onClick={handleResetLabels} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full" title="Reset Defaults">
             <RefreshCw size={18} />
           </button>
         </div>
@@ -178,6 +185,29 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-red-50 p-6 md:p-8 rounded-xl shadow-sm border border-red-100">
+         <div className="flex items-start gap-3">
+            <div className="p-2 bg-red-100 rounded-full text-red-600">
+                <AlertTriangle size={24} />
+            </div>
+            <div className="flex-1">
+                <h2 className="text-lg font-bold text-red-800 mb-2">Danger Zone</h2>
+                <p className="text-sm text-red-700 mb-4">
+                    Delete all data and reset the application to its factory state. 
+                    This will remove all your asset records and expenses from this device.
+                </p>
+                <button 
+                    onClick={handleClearAllData}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-sm transition-colors"
+                >
+                    <Trash2 size={18} />
+                    Clear All Data
+                </button>
+            </div>
+         </div>
       </div>
     </div>
   );

@@ -46,11 +46,25 @@ const StatCard = ({
 );
 
 const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewIncome, onViewExpenses, onViewMetric }) => {
-  const latest = data[data.length - 1] || {} as FinanceRecord;
-  const previous = data[data.length - 2];
+  // Use a default object to safely handle empty data scenarios
+  const latest: FinanceRecord = data.length > 0 ? data[data.length - 1] : {
+    id: 'default',
+    date: 'N/A',
+    cash: { hsbc: 0, citi: 0, other: 0, total: 0 },
+    investment: { sofi: 0, binance: 0, total: 0 },
+    yen: 0,
+    totalAssets: 0,
+    gain: 0,
+    income: 0,
+    mpf: 0
+  };
+
+  const previous = data.length > 1 ? data[data.length - 2] : null;
   
   const gainSinceLast = latest.totalAssets - (previous?.totalAssets || latest.totalAssets);
-  const gainPercent = previous?.totalAssets ? (gainSinceLast / previous.totalAssets) * 100 : 0;
+  const gainPercent = (previous?.totalAssets && previous.totalAssets !== 0) 
+    ? (gainSinceLast / previous.totalAssets) * 100 
+    : 0;
 
   // Calculate Average Monthly Income
   // Filter out records with 0 or missing income to get a true "working" average
@@ -63,14 +77,15 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewI
   
   const netSavings = (latest.income || 0) - monthlyExpenses;
 
-  const chartData = data.map(d => ({
-    name: d.date === 'Unknown Date' ? 'Latest' : d.date.split('/')[1] + '/' + d.date.split('/')[2], // MM/DD
-    Total: d.totalAssets,
-    Cash: d.cash.total,
-    Investment: d.investment.total,
-    [settings.labels.yen]: d.yen, // Use dynamic label
-    MPF: d.mpf
-  }));
+  // Safely construct chart data only if we have data, otherwise use an empty array or a placeholder
+  const chartData = data.length > 0 ? data.map(d => ({
+    name: d.date === 'Unknown Date' ? 'Latest' : (d.date.includes('/') ? d.date.split('/')[1] + '/' + d.date.split('/')[2] : d.date), // MM/DD
+    Total: d.totalAssets || 0,
+    Cash: d.cash?.total || 0,
+    Investment: d.investment?.total || 0,
+    [settings.labels.yen]: d.yen || 0, 
+    MPF: d.mpf || 0
+  })) : [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -126,44 +141,57 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewI
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-[350px]">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Wealth Growth Trend</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis hide={true} domain={['auto', 'auto']} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
-              <Area type="monotone" dataKey="Total" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis hide={true} domain={['auto', 'auto']} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Area type="monotone" dataKey="Total" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                </AreaChart>
+              </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                <p>No data available</p>
+                <p className="text-xs mt-1">Add your first asset record to see trends.</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-[350px]">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Asset Allocation</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis hide={true} />
-              <Tooltip 
-                cursor={{fill: 'transparent'}}
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
-              <Legend iconType="circle" />
-              <Bar dataKey="Cash" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Investment" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
-              <Bar dataKey={settings.labels.yen} stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis hide={true} />
+                <Tooltip 
+                    cursor={{fill: 'transparent'}}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                />
+                <Legend iconType="circle" />
+                <Bar dataKey="Cash" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Investment" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
+                <Bar dataKey={settings.labels.yen} stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                </BarChart>
+            </ResponsiveContainer>
+          ) : (
+             <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                <p>No allocation data</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
