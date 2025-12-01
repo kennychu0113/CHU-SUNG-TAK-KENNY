@@ -46,10 +46,10 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
   };
 
   const handleExportExpenses = () => {
-    const header = `Date,Category,Item,Amount,Note`;
-    const rows = expenses.map(e => `${e.date},${e.category},"${e.item}",${e.amount},"${e.note || ''}"`);
+    const header = `Category,Item,Amount,Note`;
+    const rows = expenses.map(e => `${e.category},"${e.item}",${e.amount},"${e.note || ''}"`);
     const csvContent = [header, ...rows].join('\n');
-    downloadCSV(csvContent, `WealthTrack_Expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    downloadCSV(csvContent, `WealthTrack_Recurring_Expenses.csv`);
   };
 
   return (
@@ -78,7 +78,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
             >
                 <FileSpreadsheet size={32} className="text-slate-400 group-hover:text-rose-600 mb-2 transition-colors" />
                 <span className="font-semibold text-slate-700 group-hover:text-rose-800">Export Expenses CSV</span>
-                <span className="text-xs text-slate-400 mt-1">All expense transactions</span>
+                <span className="text-xs text-slate-400 mt-1">All recurring items</span>
             </button>
          </div>
       </div>

@@ -8,14 +8,14 @@ export const INITIAL_CSV_DATA = `紀錄日期,Cash,HSBC,CITI,Other,Investment,So
 ,"$92,503","$57,200","$31,103","$4,200","$101,140","$92,590","$8,550","$1,390","$195,033","$12,068.95","$25,830.00","$76,214",`;
 
 // Paste your Excel Expense sheet data here (CSV format)
-// Format: Date, Category, Item, Amount, Note
-export const INITIAL_EXPENSE_DATA = `Date,Category,Item,Amount,Note
-2025/10/01,Food,Lunch with colleagues,120,Team lunch
-2025/10/05,Transport,Monthly MTR Pass,480,
-2025/10/08,Shopping,Uniqlo,350,Winter clothes
-2025/10/12,Food,Groceries,450,Weekly stock
-2025/10/15,Utilities,Phone Bill,188,
-2025/10/20,Entertainment,Movie tickets,240,
-2025/10/25,Food,Dinner,300,
-2025/11/01,Rent,Monthly Rent,8500,
-2025/11/02,Transport,Taxi,85,Late night`;
+// Format: Category, Item, Amount, Note
+export const INITIAL_EXPENSE_DATA = `Category,Item,Amount,Note
+Food,Lunch with colleagues,120,Team lunch
+Transport,Monthly MTR Pass,480,
+Shopping,Uniqlo,350,Winter clothes
+Food,Groceries,450,Weekly stock
+Utilities,Phone Bill,188,
+Entertainment,Movie tickets,240,
+Food,Dinner,300,
+Rent,Monthly Rent,8500,
+Transport,Taxi,85,Late night`;

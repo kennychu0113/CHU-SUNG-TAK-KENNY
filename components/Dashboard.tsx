@@ -58,20 +58,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewI
   const totalIncome = incomeRecords.reduce((sum, r) => sum + r.income, 0);
   const avgIncome = incomeRecords.length > 0 ? totalIncome / incomeRecords.length : 0;
 
-  // Calculate total expenses (simple sum for now, realistically should be monthly)
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  // Calculate total monthly recurring expenses (sum of all expense items)
+  const monthlyExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   
-  // Calculate expenses for the current month of the latest record
-  const currentMonth = new Date(latest.date).getMonth();
-  const currentYear = new Date(latest.date).getFullYear();
-  
-  const monthlyExpenses = expenses
-    .filter(e => {
-        const d = new Date(e.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    })
-    .reduce((sum, e) => sum + e.amount, 0);
-
   const netSavings = (latest.income || 0) - monthlyExpenses;
 
   const chartData = data.map(d => ({
@@ -103,9 +92,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewI
           onClick={onViewIncome}
         />
         <StatCard 
-            title="Monthly Expenses" 
+            title="Recurring Expenses" 
             value={formatCurrency(monthlyExpenses)} 
-            subtext="Click for details"
+            subtext="Total monthly cost"
             icon={<CreditCard size={20} />}
             color="bg-rose-50 text-rose-600"
             trend="down"
@@ -114,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, expenses, settings, onViewI
         <StatCard 
           title="Net Savings" 
           value={formatCurrency(netSavings)} 
-          subtext="Latest Income - Expenses"
+          subtext="Latest Income - Recurring Expenses"
           icon={<PiggyBank size={20} />}
           color="bg-blue-50 text-blue-600"
         />

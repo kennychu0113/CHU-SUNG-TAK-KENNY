@@ -22,7 +22,6 @@ export interface FinanceRecord {
 
 export interface ExpenseRecord {
   id: string;
-  date: string;
   category: string;
   item: string;
   amount: number;

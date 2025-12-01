@@ -92,14 +92,18 @@ export const parseExpenseCSV = (csv: string): ExpenseRecord[] => {
     const parts = line.split(',').map(p => p.trim());
     if (parts.length < 3) continue;
 
-    // Expected: Date, Category, Item, Amount, Note
+    // OLD Format: Date, Category, Item, Amount, Note
+    // NEW Format: Category, Item, Amount, Note
+    // Check if first part looks like a date (simple check) to handle backward compatibility lightly
+    const isDate = parts[0].includes('/') || parts[0].includes('-');
+    const offset = isDate ? 1 : 0;
+
     records.push({
       id: `exp-${i}-${Date.now()}`,
-      date: parts[0],
-      category: parts[1] || 'Uncategorized',
-      item: parts[2] || 'Expense',
-      amount: parseCurrency(parts[3]),
-      note: parts[4] || ''
+      category: parts[0 + offset] || 'Uncategorized',
+      item: parts[1 + offset] || 'Expense',
+      amount: parseCurrency(parts[2 + offset]),
+      note: parts[3 + offset] || ''
     });
   }
   return records;

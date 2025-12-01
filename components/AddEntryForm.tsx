@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FinanceRecord, AppSettings } from '../types';
-import { Save } from 'lucide-react';
+import { Save, Calculator, RefreshCw, Loader2 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 
 interface AddEntryFormProps {
   onAdd: (record: FinanceRecord) => void;
@@ -54,6 +55,12 @@ const AddEntryForm: React.FC<AddEntryFormProps> = ({ onAdd, lastRecord, settings
   const [grandTotal, setGrandTotal] = useState(0);
   const [gain, setGain] = useState(0);
 
+  // FX Calculator State
+  const [showFx, setShowFx] = useState(false);
+  const [fxAmount, setFxAmount] = useState('');
+  const [fxRate, setFxRate] = useState('');
+  const [loadingRate, setLoadingRate] = useState(false);
+
   // Initialize form with initialData if editing
   useEffect(() => {
     if (initialData) {
@@ -94,20 +101,62 @@ const AddEntryForm: React.FC<AddEntryFormProps> = ({ onAdd, lastRecord, settings
     setInvTotal(iTotal);
     setGrandTotal(gTotal);
     
-    // Gain logic: If editing, gain is (current total - previous record total).
-    // If adding new, gain is (current total - last record total).
-    // This simple logic might be slightly off when editing historical records out of order, 
-    // but works for the general use case.
+    // Gain logic
     if (lastRecord && (!initialData || lastRecord.id !== initialData.id)) {
         setGain(gTotal - lastRecord.totalAssets);
     } else if (initialData) {
-        // If editing, preserve the original logic or recalculate based on *its* previous.
-        // For simplicity, we just recalculate based on current form values vs what it was? 
-        // Actually best to just let it update based on the *current latest* logic or just use the calculated totals.
-        // Let's just update the stored gain.
-        setGain(gTotal - (lastRecord?.totalAssets || 0)); // Rought approx
+        setGain(gTotal - (lastRecord?.totalAssets || 0));
     }
   }, [hsbc, citi, other, sofi, binance, yen, lastRecord, initialData]);
+
+  const fetchRate = async () => {
+    if (!process.env.API_KEY) {
+        alert("API Key not found. Cannot fetch rates.");
+        return;
+    }
+    setLoadingRate(true);
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const currency = settings.labels.yen || 'Yen';
+        // Use Gemini to get the rate
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `What is the current exchange rate of 1 ${currency} to HKD? Return ONLY the numeric exchange rate value (e.g. 0.052 or 7.85). Do not include any text.`,
+            config: {
+                tools: [{ googleSearch: {} }]
+            }
+        });
+        
+        const text = response.text || '';
+        // Extract first number
+        const match = text.match(/[\d.]+/);
+        if (match && !isNaN(parseFloat(match[0]))) {
+             const rate = match[0];
+             setFxRate(rate);
+             if (fxAmount) {
+                 const calc = parseFloat(fxAmount) * parseFloat(rate);
+                 setYen(calc.toFixed(0));
+             }
+        } else {
+             alert("Could not retrieve a valid rate.");
+        }
+    } catch (e) {
+        console.error("FX Fetch Error", e);
+        alert("Failed to fetch exchange rate online.");
+    } finally {
+        setLoadingRate(false);
+    }
+  };
+
+  const updateFx = (amt: string, rate: string) => {
+      setFxAmount(amt);
+      setFxRate(rate);
+      const a = parseFloat(amt);
+      const r = parseFloat(rate);
+      if (!isNaN(a) && !isNaN(r)) {
+          setYen((a * r).toFixed(0));
+      }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +181,6 @@ const AddEntryForm: React.FC<AddEntryFormProps> = ({ onAdd, lastRecord, settings
       mpf: parseFloat(mpf) || 0
     };
     onAdd(newRecord);
-    // Only reset if adding new
     if (!initialData) {
         setIncome('');
     }
@@ -169,10 +217,78 @@ const AddEntryForm: React.FC<AddEntryFormProps> = ({ onAdd, lastRecord, settings
             <span className="text-lg font-bold text-blue-800">${cashTotal.toLocaleString()}</span>
         </div>
 
-        <SectionHeader title="Investments" />
+        <SectionHeader title="Investments & Foreign" />
         <InputGroup label={settings.labels.sofi} value={sofi} onChange={setSofi} />
         <InputGroup label={settings.labels.binance} value={binance} onChange={setBinance} />
-        <InputGroup label={settings.labels.yen} value={yen} onChange={setYen} />
+        
+        {/* Foreign Currency Section with Calculator */}
+        <div className="col-span-full md:col-span-1">
+             <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide truncate" title={settings.labels.yen}>
+                    {settings.labels.yen} (HKD)
+                </label>
+                <button 
+                    type="button"
+                    onClick={() => setShowFx(!showFx)}
+                    className="text-emerald-600 hover:text-emerald-700 text-xs font-medium flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full transition-colors"
+                >
+                    <Calculator size={12} />
+                    {showFx ? 'Close Calc' : 'FX Calc'}
+                </button>
+             </div>
+             
+             {showFx ? (
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3 mb-2 animate-in slide-in-from-top-2 shadow-sm">
+                    <div>
+                        <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Amount in {settings.labels.yen}</label>
+                        <input 
+                            type="number" 
+                            value={fxAmount}
+                            onChange={(e) => updateFx(e.target.value, fxRate)}
+                            placeholder="e.g. 10000"
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:ring-1 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] text-slate-400 uppercase font-bold">Rate to HKD</label>
+                            <button 
+                                type="button"
+                                onClick={fetchRate}
+                                disabled={loadingRate}
+                                className="text-[10px] bg-white border border-blue-200 text-blue-600 px-2 py-0.5 rounded hover:bg-blue-50 flex items-center gap-1 transition-colors"
+                            >
+                                {loadingRate ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                                Fetch Online
+                            </button>
+                        </div>
+                        <input 
+                            type="number" 
+                            value={fxRate}
+                            onChange={(e) => updateFx(fxAmount, e.target.value)}
+                            placeholder="0.0"
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:ring-1 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div className="text-right border-t border-slate-200 pt-2 flex justify-between items-end">
+                         <span className="text-xs text-slate-400">HKD Value:</span>
+                         <span className="font-bold text-emerald-600 text-lg">${yen || '0'}</span>
+                    </div>
+                </div>
+             ) : (
+                <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                    <input
+                        type="number"
+                        value={yen}
+                        onChange={(e) => setYen(e.target.value)}
+                        placeholder="0"
+                        className="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                    />
+                </div>
+             )}
+        </div>
+
         <div className="md:col-span-2 lg:col-span-3 bg-indigo-50 p-3 rounded-lg flex justify-between items-center">
             <span className="text-sm text-indigo-800 font-medium">Investments Total (Auto)</span>
             <span className="text-lg font-bold text-indigo-800">${invTotal.toLocaleString()}</span>

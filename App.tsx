@@ -207,9 +207,9 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto md:flex md:h-screen overflow-hidden">
+      <div className="w-full md:flex md:h-screen overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col w-64 h-full bg-white border-r border-slate-200 p-6 z-30">
+        <aside className="hidden md:flex flex-col w-64 h-full bg-white border-r border-slate-200 p-6 z-30 shrink-0">
           <div className="mb-10 flex items-center gap-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">W</div>
             <h1 className="text-xl font-bold text-slate-800">WealthTrack</h1>
@@ -239,7 +239,7 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto h-[calc(100vh-65px)] md:h-full">
-          <div className="p-4 md:p-8 md:max-w-6xl mx-auto">
+          <div className="p-4 md:p-8 w-full mx-auto">
             <header className="mb-8 hidden md:block">
                 <h2 className="text-2xl font-bold text-slate-800 capitalize">
                     {view === 'add_asset' ? (editingAsset ? 'Edit Asset Record' : 'Add Asset Record') : 
