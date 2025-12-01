@@ -26,8 +26,19 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ data }) => {
     }
   }, [messages]);
 
+  // Safely check for API Key to prevent crashes in environments where process is undefined
+  const getApiKey = () => {
+    try {
+      return process.env.API_KEY;
+    } catch (e) {
+      return undefined;
+    }
+  };
+
+  const apiKey = getApiKey();
+
   const handleSend = async () => {
-    if (!input.trim() || !process.env.API_KEY) return;
+    if (!input.trim() || !apiKey) return;
     
     const userMsg = input;
     setInput('');
@@ -35,7 +46,7 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ data }) => {
     setLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       // Prepare context safely
       const contextData = JSON.stringify(data.slice(-6)); // Send last 6 months to avoid token limits if list grows huge
@@ -62,7 +73,7 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ data }) => {
     }
   };
 
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     return (
         <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 p-8 text-center bg-white rounded-xl border border-slate-100 shadow-sm">
             <Sparkles size={48} className="mb-4 text-slate-200" />
