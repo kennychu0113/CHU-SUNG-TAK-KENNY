@@ -58,6 +58,48 @@ const SettingsCard = ({
     );
 };
 
+// Extracted to prevent re-rendering/focus loss issues
+const AccountSection = ({ 
+    type, 
+    title, 
+    icon: Icon, 
+    colorClass, 
+    bgClass,
+    accounts,
+    onRename,
+    onDelete
+}: { 
+    type: AccountType, 
+    title: string, 
+    icon: any, 
+    colorClass: string, 
+    bgClass: string,
+    accounts: Account[],
+    onRename: (id: string, val: string) => void,
+    onDelete: (id: string) => void
+}) => (
+     <div className="space-y-3">
+        <h3 className={`text-sm font-bold ${colorClass} uppercase tracking-wide ${bgClass} p-2 rounded-lg flex items-center gap-2`}>
+            <Icon size={16} /> {title}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {accounts.filter(a => a.type === type).map(acc => (
+                <div key={acc.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <input 
+                        type="text" 
+                        value={acc.name} 
+                        onChange={(e) => onRename(acc.id, e.target.value)}
+                        className="flex-1 bg-transparent border-none text-sm focus:ring-0 text-slate-700 font-medium"
+                    />
+                    <button type="button" onClick={() => onDelete(acc.id)} className="text-slate-400 hover:text-rose-500 p-1">
+                        <X size={14} />
+                    </button>
+                </div>
+            ))}
+        </div>
+     </div>
+);
+
 const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, expenses, onLoadSampleData, onRestore }) => {
   const [categories, setCategories] = useState<string[]>(settings.expenseCategories || []);
   const [newCategory, setNewCategory] = useState('');
@@ -231,29 +273,6 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
       }
   };
 
-  const AccountSection = ({ type, title, icon: Icon, colorClass, bgClass }: { type: AccountType, title: string, icon: any, colorClass: string, bgClass: string }) => (
-     <div className="space-y-3">
-        <h3 className={`text-sm font-bold ${colorClass} uppercase tracking-wide ${bgClass} p-2 rounded-lg flex items-center gap-2`}>
-            <Icon size={16} /> {title}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {accounts.filter(a => a.type === type).map(acc => (
-                <div key={acc.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                    <input 
-                        type="text" 
-                        value={acc.name} 
-                        onChange={(e) => handleRenameAccount(acc.id, e.target.value)}
-                        className="flex-1 bg-transparent border-none text-sm focus:ring-0 text-slate-700 font-medium"
-                    />
-                    <button type="button" onClick={() => handleDeleteAccount(acc.id)} className="text-slate-400 hover:text-rose-500 p-1">
-                        <X size={14} />
-                    </button>
-                </div>
-            ))}
-        </div>
-     </div>
-  );
-
   return (
     <div className="max-w-3xl mx-auto animate-in fade-in zoom-in-95 duration-300 space-y-5 pb-12">
       
@@ -301,6 +320,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
                 icon={Wallet} 
                 colorClass="text-blue-700" 
                 bgClass="bg-blue-50"
+                accounts={accounts}
+                onRename={handleRenameAccount}
+                onDelete={handleDeleteAccount}
               />
               <AccountSection 
                 type="investment" 
@@ -308,6 +330,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
                 icon={TrendingUp} 
                 colorClass="text-indigo-700" 
                 bgClass="bg-indigo-50"
+                accounts={accounts}
+                onRename={handleRenameAccount}
+                onDelete={handleDeleteAccount}
               />
               <AccountSection 
                 type="other" 
@@ -315,6 +340,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ settings, onSave, data, exp
                 icon={Globe} 
                 colorClass="text-rose-700" 
                 bgClass="bg-rose-50"
+                accounts={accounts}
+                onRename={handleRenameAccount}
+                onDelete={handleDeleteAccount}
               />
           </div>
 
