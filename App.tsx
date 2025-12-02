@@ -460,6 +460,7 @@ const App: React.FC = () => {
                     dataKey={metricConfig.key}
                     color={metricConfig.color}
                     onBack={() => setView('dashboard')}
+                    settings={settings}
                 />
             )}
 
@@ -470,6 +471,7 @@ const App: React.FC = () => {
                     dataKey="mpf"
                     color="#8b5cf6"
                     onBack={() => setView('dashboard')}
+                    settings={settings}
                 />
             )}
 
