@@ -1,37 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { ExpenseRecord } from '../types';
+import { ExpenseRecord, AppSettings } from '../types';
 import { Save, X } from 'lucide-react';
 
 interface AddExpenseFormProps {
   onAdd: (record: ExpenseRecord) => void;
   onCancel: () => void;
   initialData?: ExpenseRecord | null;
+  settings: AppSettings;
 }
 
-const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAdd, onCancel, initialData }) => {
-  const [category, setCategory] = useState('Food');
+const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAdd, onCancel, initialData, settings }) => {
+  const [category, setCategory] = useState(settings.expenseCategories[0] || 'Food');
   const [item, setItem] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
 
-  const categories = ['Food', 'Transport', 'Shopping', 'Utilities', 'Entertainment', 'Rent', 'Health', 'Other'];
+  // Fallback if settings.expenseCategories is empty for some reason
+  const categories = settings.expenseCategories.length > 0 ? settings.expenseCategories : ['Food', 'Transport', 'Shopping', 'Utilities', 'Entertainment', 'Other'];
+
+  const formatValue = (val: string | number) => {
+    if (val === '' || val === undefined || val === null) return '';
+    const num = typeof val === 'string' ? parseFloat(val.replace(/,/g, '')) : val;
+    if (isNaN(num)) return '';
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   useEffect(() => {
     if (initialData) {
         setCategory(initialData.category);
         setItem(initialData.item);
-        setAmount(initialData.amount.toString());
+        setAmount(formatValue(initialData.amount));
         setNote(initialData.note || '');
+    } else {
+        // Reset category to first default when adding new
+        setCategory(categories[0]);
+        setAmount('');
     }
-  }, [initialData]);
+  }, [initialData, categories]);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow digits, dots and commas
+    if (/^[\d,.]*$/.test(val)) {
+        setAmount(val);
+    }
+  };
+
+  const handleAmountBlur = () => {
+      // Format on blur
+      if (amount) {
+          const clean = amount.replace(/,/g, '');
+          const num = parseFloat(clean);
+          if (!isNaN(num)) {
+              setAmount(formatValue(num));
+          }
+      }
+  };
+
+  const handleAmountFocus = () => {
+      // Strip formatting for easy editing
+      if (amount) {
+          const clean = amount.replace(/,/g, '');
+          const num = parseFloat(clean);
+          if (!isNaN(num)) {
+             setAmount(num.toString());
+          }
+      }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanAmount = parseFloat(amount.replace(/,/g, '')) || 0;
+    
     const newRecord: ExpenseRecord = {
       id: initialData ? initialData.id : `exp-${Date.now()}`,
       category,
       item: item || 'Expense',
-      amount: parseFloat(amount) || 0,
+      amount: cleanAmount,
       note
     };
     onAdd(newRecord);
@@ -73,13 +118,16 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAdd, onCancel, initia
         <div className="flex flex-col">
             <label className="text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Monthly Cost</label>
             <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
                 <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={handleAmountChange}
+                    onBlur={handleAmountBlur}
+                    onFocus={handleAmountFocus}
                     placeholder="0.00"
-                    className="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                    className="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 font-medium text-slate-700"
                     required
                 />
             </div>

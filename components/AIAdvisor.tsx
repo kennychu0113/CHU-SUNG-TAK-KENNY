@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FinanceRecord } from '../types';
+import { FinanceRecord, AppSettings } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 
 interface AIAdvisorProps {
   data: FinanceRecord[];
+  settings: AppSettings;
 }
 
 interface Message {
@@ -12,7 +13,7 @@ interface Message {
   text: string;
 }
 
-const AIAdvisor: React.FC<AIAdvisorProps> = ({ data }) => {
+const AIAdvisor: React.FC<AIAdvisorProps> = ({ data, settings }) => {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'model', text: 'Hello! I analyzed your financial records. Ask me anything about your spending, savings growth, or investment allocation.' }
   ]);
@@ -26,7 +27,6 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ data }) => {
     }
   }, [messages]);
 
-  // Safely check for API Key to prevent crashes in environments where process is undefined
   const getApiKey = () => {
     try {
       return process.env.API_KEY;
@@ -48,8 +48,23 @@ const AIAdvisor: React.FC<AIAdvisorProps> = ({ data }) => {
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey });
       
-      // Prepare context safely
-      const contextData = JSON.stringify(data.slice(-6)); // Send last 6 months to avoid token limits if list grows huge
+      // Prepare context: Enrich data with account names instead of IDs
+      const enrichedData = data.slice(-6).map(r => {
+          const namedValues: Record<string, number> = {};
+          Object.keys(r.values).forEach(key => {
+              const accountName = settings.accounts.find(a => a.id === key)?.name || key;
+              namedValues[accountName] = r.values[key];
+          });
+          return {
+              date: r.date,
+              assets: namedValues,
+              total: r.totalAssets,
+              income: r.income
+          };
+      });
+
+      const contextData = JSON.stringify(enrichedData);
+      
       const prompt = `
         You are a helpful financial assistant. Here is the user's financial data for the last few months (JSON format):
         ${contextData}

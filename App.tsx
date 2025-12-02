@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { INITIAL_CSV_DATA, INITIAL_EXPENSE_DATA } from './constants';
 import { parseCSVData, parseExpenseCSV } from './utils/helpers';
-import { FinanceRecord, ExpenseRecord, ViewState, AppSettings } from './types';
+import { FinanceRecord, ExpenseRecord, ViewState, AppSettings, Account, BackupData } from './types';
 import Dashboard from './components/Dashboard';
 import TransactionTable from './components/TransactionTable';
 import ExpenseTable from './components/ExpenseTable';
@@ -10,7 +10,8 @@ import AddExpenseForm from './components/AddExpenseForm';
 import SettingsForm from './components/SettingsForm';
 import IncomeHistory from './components/IncomeHistory';
 import MetricHistory from './components/MetricHistory';
-import { LayoutDashboard, List, CreditCard, Menu, X, Plus, Settings, CheckCircle2 } from 'lucide-react';
+import GoalPage from './components/GoalPage';
+import { LayoutDashboard, List, CreditCard, Menu, X, Plus, Settings, CheckCircle2, Briefcase, Target, User, MoreHorizontal, FileText } from 'lucide-react';
 
 const STORAGE_KEYS = {
   ASSETS: 'wealthtrack_assets',
@@ -19,30 +20,98 @@ const STORAGE_KEYS = {
   LAST_SAVED: 'wealthtrack_last_saved'
 };
 
+const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Utilities', 'Entertainment', 'Housing', 'Health', 'Other'];
+
+// Default accounts to map legacy data
+const DEFAULT_ACCOUNTS: Account[] = [
+    { id: 'acc_hsbc', name: 'HSBC', type: 'cash' },
+    { id: 'acc_citi', name: 'Citi', type: 'cash' },
+    { id: 'acc_other', name: 'Other', type: 'cash' },
+    { id: 'acc_sofi', name: 'Sofi', type: 'investment' },
+    { id: 'acc_binance', name: 'Binance', type: 'investment' },
+    { id: 'acc_yen', name: 'Yen', type: 'other' }
+];
+
 const DEFAULT_SETTINGS: AppSettings = {
-  labels: {
-      hsbc: 'HSBC',
-      citi: 'Citi',
-      other: 'Other',
-      sofi: 'Sofi',
-      binance: 'Binance',
-      yen: 'Yen'
-  }
+  accounts: DEFAULT_ACCOUNTS,
+  expenseCategories: DEFAULT_CATEGORIES
 };
 
 const App: React.FC = () => {
-  // Initialize Assets with Local Storage or Default CSV
-  const [data, setData] = useState<FinanceRecord[]>(() => {
+  // Initialize Settings
+  const [settings, setSettings] = useState<AppSettings>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.ASSETS);
-      return stored ? JSON.parse(stored) : parseCSVData(INITIAL_CSV_DATA);
+      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (stored) {
+          const parsed = JSON.parse(stored);
+          // Migration for settings: if 'labels' exists but 'accounts' doesn't
+          if (parsed.labels && !parsed.accounts) {
+             const migratedAccounts: Account[] = [
+                 { id: 'acc_hsbc', name: parsed.labels.hsbc || 'HSBC', type: 'cash' },
+                 { id: 'acc_citi', name: parsed.labels.citi || 'Citi', type: 'cash' },
+                 { id: 'acc_other', name: parsed.labels.other || 'Other', type: 'cash' },
+                 { id: 'acc_sofi', name: parsed.labels.sofi || 'Sofi', type: 'investment' },
+                 { id: 'acc_binance', name: parsed.labels.binance || 'Binance', type: 'investment' },
+                 { id: 'acc_yen', name: parsed.labels.yen || 'Yen', type: 'other' }
+             ];
+             return {
+                 expenseCategories: parsed.expenseCategories || DEFAULT_CATEGORIES,
+                 accounts: migratedAccounts
+             };
+          }
+          // Migration for savingGoal: years -> months if using old data structure
+          if (parsed.savingGoal && parsed.savingGoal.years && !parsed.savingGoal.months) {
+             parsed.savingGoal.months = parsed.savingGoal.years * 12;
+          }
+
+          return {
+              ...DEFAULT_SETTINGS,
+              ...parsed,
+              accounts: parsed.accounts || DEFAULT_ACCOUNTS,
+              expenseCategories: parsed.expenseCategories || DEFAULT_CATEGORIES
+          };
+      }
+      return DEFAULT_SETTINGS;
     } catch (e) {
-      console.error("Failed to load assets from storage", e);
-      return parseCSVData(INITIAL_CSV_DATA);
+      return DEFAULT_SETTINGS;
     }
   });
 
-  // Initialize Expenses with Local Storage or Default CSV
+  // Initialize Assets with Migration Logic
+  const [data, setData] = useState<FinanceRecord[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ASSETS);
+      let loadedData = stored ? JSON.parse(stored) : parseCSVData(INITIAL_CSV_DATA);
+      
+      // Perform Migration if data is in old format (has 'cash' property)
+      if (loadedData.length > 0 && loadedData[0].cash) {
+          console.log("Migrating legacy data to new format...");
+          loadedData = loadedData.map((r: any) => ({
+              id: r.id,
+              date: r.date,
+              values: {
+                  'acc_hsbc': r.cash.hsbc,
+                  'acc_citi': r.cash.citi,
+                  'acc_other': r.cash.other,
+                  'acc_sofi': r.investment.sofi,
+                  'acc_binance': r.investment.binance,
+                  'acc_yen': r.yen
+              },
+              income: r.income,
+              mpf: r.mpf,
+              note: r.note,
+              totalAssets: r.totalAssets,
+              gain: r.gain
+          }));
+      }
+      return loadedData;
+    } catch (e) {
+      console.error("Failed to load assets from storage", e);
+      return []; // Return empty on error to be safe
+    }
+  });
+
+  // Initialize Expenses
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.EXPENSES);
@@ -52,25 +121,6 @@ const App: React.FC = () => {
       return parseExpenseCSV(INITIAL_EXPENSE_DATA);
     }
   });
-  
-  // Initialize Settings with Local Storage or Default
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      if (stored) {
-          const parsed = JSON.parse(stored);
-          // Deep merge to ensure all keys exist (prevents crash if new keys are added)
-          return {
-              ...DEFAULT_SETTINGS,
-              ...parsed,
-              labels: { ...DEFAULT_SETTINGS.labels, ...parsed.labels }
-          };
-      }
-      return DEFAULT_SETTINGS;
-    } catch (e) {
-      return DEFAULT_SETTINGS;
-    }
-  });
 
   const [lastSaved, setLastSaved] = useState<Date | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEYS.LAST_SAVED);
@@ -78,7 +128,7 @@ const App: React.FC = () => {
   });
 
   const [view, setView] = useState<ViewState>('dashboard');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Used for the "More" tab
   const [editingAsset, setEditingAsset] = useState<FinanceRecord | null>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
   
@@ -155,7 +205,20 @@ const App: React.FC = () => {
 
   const handleSaveSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
-    alert('Settings saved successfully!');
+    if (view === 'settings') {
+        alert('Settings saved successfully!');
+    }
+  };
+
+  const handleRestoreData = (backup: BackupData) => {
+    try {
+        if (backup.settings) setSettings(backup.settings);
+        if (backup.assets) setData(backup.assets);
+        if (backup.expenses) setExpenses(backup.expenses);
+        alert(`Data restored successfully from ${new Date(backup.timestamp).toLocaleDateString()}!`);
+    } catch (e) {
+        alert('Failed to restore data. File might be corrupted.');
+    }
   };
 
   const handleViewMetric = (key: string, title: string, color: string) => {
@@ -163,101 +226,212 @@ const App: React.FC = () => {
     setView('metric_history');
   };
 
-  const NavItem = ({ id, label, icon }: { id: ViewState, label: string, icon: React.ReactNode }) => (
-    <button
-      onClick={() => {
-        setView(id);
-        setIsMobileMenuOpen(false);
-        // Reset edit states when navigating via menu
-        setEditingAsset(null);
-        setEditingExpense(null);
-        setMetricConfig(null);
-      }}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all w-full md:w-auto ${
-        (view === id || (view.startsWith('add_') && id === view.replace('add_', '') + 's' as any)) // keep parent active
-          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 font-medium' 
-          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
+  const handleGoToDashboard = () => {
+    setView('dashboard');
+    setEditingAsset(null);
+    setEditingExpense(null);
+    setMetricConfig(null);
+    setMobileMenuOpen(false);
+  };
+
+  const handleLoadSampleData = () => {
+    if (window.confirm("This will overwrite your current data with sample data. Continue?")) {
+        // Reset to default accounts first to match CSV structure
+        const defaultSet = { ...settings, accounts: DEFAULT_ACCOUNTS };
+        setSettings(defaultSet);
+        
+        // Parse and migrate fresh sample data
+        let sampleData = parseCSVData(INITIAL_CSV_DATA);
+        if (sampleData.length > 0 && sampleData[0].cash) {
+             sampleData = sampleData.map((r: any) => ({
+              id: r.id,
+              date: r.date,
+              values: {
+                  'acc_hsbc': r.cash.hsbc,
+                  'acc_citi': r.cash.citi,
+                  'acc_other': r.cash.other,
+                  'acc_sofi': r.investment.sofi,
+                  'acc_binance': r.investment.binance,
+                  'acc_yen': r.yen
+              },
+              income: r.income,
+              mpf: r.mpf,
+              note: r.note,
+              totalAssets: r.totalAssets,
+              gain: r.gain
+          }));
+        }
+
+        setData(sampleData);
+        setExpenses(parseExpenseCSV(INITIAL_EXPENSE_DATA));
+        alert("Sample data loaded! Redirecting to dashboard...");
+        setView('dashboard');
+    }
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const NavItem = ({ id, label, icon }: { id: ViewState, label: string, icon: React.ReactNode }) => {
+    const isActive = view === id || (view.startsWith('add_') && id === view.replace('add_', '') + 's' as any);
+    return (
+      <button
+        onClick={() => {
+          setView(id);
+          setEditingAsset(null);
+          setEditingExpense(null);
+          setMetricConfig(null);
+        }}
+        className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all w-full md:w-auto font-medium ${
+          isActive
+            ? 'bg-emerald-900 text-white shadow-lg shadow-emerald-200/50' 
+            : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-900'
+        }`}
+      >
+        {icon}
+        <span>{label}</span>
+      </button>
+    );
+  };
+
+  const MobileTab = ({ id, label, icon }: { id: ViewState, label: string, icon: React.ReactNode }) => {
+    const isActive = view === id || (view.startsWith('add_') && id === view.replace('add_', '') + 's' as any);
+    return (
+        <button 
+            onClick={() => {
+                setView(id);
+                setMobileMenuOpen(false);
+                setEditingAsset(null);
+                setEditingExpense(null);
+                setMetricConfig(null);
+            }}
+            className={`flex flex-col items-center justify-center p-2 w-full transition-colors ${isActive ? 'text-emerald-800' : 'text-slate-400 hover:text-emerald-600'}`}
+        >
+            <div className={`mb-1 ${isActive ? 'scale-110 transform' : ''} transition-transform`}>{icon}</div>
+            <span className="text-[10px] font-bold tracking-wide">{label}</span>
+        </button>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-20 md:pb-0">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white px-4 py-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-50">
-        <h1 className="text-xl font-bold text-slate-800 tracking-tight">WealthTrack</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600">
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
+    <div className="min-h-screen bg-slate-50/50 font-sans pb-[90px] md:pb-0">
+      
+      {/* Mobile Top Bar */}
+      <div className="md:hidden bg-white/80 backdrop-blur-md px-4 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 z-50">
+        <div 
+            onClick={handleGoToDashboard}
+            className="flex items-center gap-2 cursor-pointer active:opacity-70 transition-opacity"
+        >
+            <div className="w-8 h-8 bg-emerald-900 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm">WT</div>
+            <h1 className="text-lg font-bold text-slate-800 tracking-tight">WealthTrack</h1>
+        </div>
+        {lastSaved && (
+             <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                 <CheckCircle2 size={10} className="text-emerald-500" />
+                 Saved
+             </div>
+        )}
       </div>
 
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-white pt-20 px-4 space-y-2 flex flex-col">
-            <NavItem id="dashboard" label="Dashboard" icon={<LayoutDashboard size={20} />} />
-            <NavItem id="assets" label="Assets" icon={<List size={20} />} />
-            <NavItem id="expenses" label="Expenses" icon={<CreditCard size={20} />} />
-            <NavItem id="settings" label="Settings" icon={<Settings size={20} />} />
-            
-            <div className="mt-auto mb-8 px-4 py-4 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-2 text-emerald-600 mb-1">
-                    <CheckCircle2 size={16} />
-                    <span className="text-xs font-semibold uppercase tracking-wider">Auto-Saved</span>
-                </div>
-                 {lastSaved && (
-                    <p className="text-xs text-slate-400">
-                        {lastSaved.toLocaleDateString()} {lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </p>
-                )}
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-5px_10px_rgba(0,0,0,0.02)] z-50 pb-safe">
+        <div className="flex justify-between items-end px-2 py-2">
+            <MobileTab id="dashboard" label="Overview" icon={<LayoutDashboard size={22} />} />
+            <MobileTab id="assets" label="Assets" icon={<List size={22} />} />
+            <MobileTab id="expenses" label="Expenses" icon={<CreditCard size={22} />} />
+            <MobileTab id="goals" label="Goals" icon={<Target size={22} />} />
+            <button 
+                onClick={() => setMobileMenuOpen(true)}
+                className={`flex flex-col items-center justify-center p-2 w-full transition-colors ${mobileMenuOpen ? 'text-emerald-800' : 'text-slate-400 hover:text-emerald-600'}`}
+            >
+                <MoreHorizontal size={22} className="mb-1" />
+                <span className="text-[10px] font-bold tracking-wide">More</span>
+            </button>
+        </div>
+      </div>
+
+      {/* Mobile "More" Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
+            <div className="absolute bottom-[80px] right-4 w-56 bg-white rounded-2xl shadow-2xl p-2 border border-slate-100 animate-in slide-in-from-bottom-5 duration-200" onClick={e => e.stopPropagation()}>
+                <button 
+                    onClick={() => { setView('mpf'); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-slate-700 hover:bg-slate-50 rounded-xl transition-colors font-medium text-sm"
+                >
+                    <Briefcase size={18} className="text-violet-600" /> MPF / Pension
+                </button>
+                <button 
+                    onClick={() => { setView('settings'); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-slate-700 hover:bg-slate-50 rounded-xl transition-colors font-medium text-sm"
+                >
+                    <Settings size={18} className="text-slate-500" /> Settings
+                </button>
             </div>
         </div>
       )}
 
       <div className="w-full md:flex md:h-screen overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col w-64 h-full bg-white border-r border-slate-200 p-6 z-30 shrink-0">
-          <div className="mb-10 flex items-center gap-2">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">W</div>
-            <h1 className="text-xl font-bold text-slate-800">WealthTrack</h1>
+        <aside className="hidden md:flex flex-col w-64 h-full bg-white border-r border-slate-100 p-6 z-30 shrink-0">
+          <div 
+            onClick={handleGoToDashboard}
+            className="mb-10 flex items-center gap-3 cursor-pointer group px-2"
+          >
+            <div className="w-9 h-9 bg-emerald-900 rounded-xl flex items-center justify-center text-white font-bold text-lg group-hover:scale-105 transition-transform shadow-lg shadow-emerald-200">W</div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">WealthTrack</h1>
           </div>
           <nav className="space-y-2 flex-1">
-            <NavItem id="dashboard" label="Dashboard" icon={<LayoutDashboard size={20} />} />
+            <NavItem id="dashboard" label="Overview" icon={<LayoutDashboard size={20} />} />
+            <NavItem id="goals" label="Goals" icon={<Target size={20} />} />
             <NavItem id="assets" label="Assets" icon={<List size={20} />} />
             <NavItem id="expenses" label="Expenses" icon={<CreditCard size={20} />} />
+            <NavItem id="mpf" label="MPF / Pension" icon={<Briefcase size={20} />} />
             <NavItem id="settings" label="Settings" icon={<Settings size={20} />} />
           </nav>
           
-          <div className="mt-auto pt-6 border-t border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-                <div className={`w-2 h-2 rounded-full ${lastSaved ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`}></div>
-                <span className="text-xs font-medium text-slate-500">Device Storage Active</span>
+          <div className="mt-auto pt-6 border-t border-slate-50">
+            <div className="flex items-center gap-2 mb-2 px-2">
+                <div className={`w-2 h-2 rounded-full ${lastSaved ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                <span className="text-xs font-medium text-slate-500">Data saved on device</span>
             </div>
-             {lastSaved && (
-                <p className="text-[10px] text-slate-400 pl-4">
-                    Saved: {lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </p>
-            )}
-             <div className="text-[10px] text-slate-300 mt-4">
-                v1.6.0 &copy; 2025
+             <div className="text-[10px] text-slate-300 mt-2 px-2">
+                Professional Edition 2025
             </div>
           </div>
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto h-[calc(100vh-65px)] md:h-full">
-          <div className="p-4 md:p-8 w-full mx-auto">
+        <main className="flex-1 overflow-y-auto h-full scroll-smooth">
+          <div className="p-4 md:p-10 w-full mx-auto max-w-7xl">
             <header className="mb-8 hidden md:block">
-                <h2 className="text-2xl font-bold text-slate-800 capitalize">
-                    {view === 'add_asset' ? (editingAsset ? 'Edit Asset Record' : 'Add Asset Record') : 
-                     view === 'add_expense' ? (editingExpense ? 'Edit Expense' : 'Log Expense') : 
-                     view === 'income_history' ? 'Income Analysis' :
-                     view === 'metric_history' ? (metricConfig?.title || 'History') :
-                     view}
-                </h2>
-                <p className="text-slate-500 text-sm">Manage your financial growth</p>
+                {view === 'dashboard' ? (
+                   <div>
+                     <p className="text-slate-500 text-sm mb-1">{getGreeting()},</p>
+                     <h2 className="text-3xl font-bold text-slate-800">Welcome to your dashboard</h2>
+                   </div>
+                ) : (
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800 capitalize">
+                        {view === 'add_asset' ? (editingAsset ? 'Update Asset Record' : 'New Asset Entry') : 
+                        view === 'add_expense' ? (editingExpense ? 'Edit Bill' : 'Add Monthly Expense') : 
+                        view === 'income_history' ? 'Income Analysis' :
+                        view === 'metric_history' ? (metricConfig?.title || 'Trend Analysis') :
+                        view === 'mpf' ? 'MPF Portfolio' :
+                        view === 'assets' ? 'Asset History' :
+                        view}
+                    </h2>
+                    <p className="text-slate-500 text-sm">
+                      {view === 'goals' ? 'Plan your financial future' : 
+                       view === 'assets' ? 'Track your wealth over time' :
+                       view === 'expenses' ? 'Manage your recurring costs' :
+                       'Manage your finances'}
+                    </p>
+                  </div>
+                )}
             </header>
 
             {view === 'dashboard' && (
@@ -268,6 +442,16 @@ const App: React.FC = () => {
                     onViewIncome={() => setView('income_history')}
                     onViewExpenses={() => setView('expenses')}
                     onViewMetric={handleViewMetric}
+                    onUpdateSettings={handleSaveSettings}
+                />
+            )}
+            
+            {view === 'goals' && (
+                <GoalPage 
+                    settings={settings}
+                    data={data}
+                    expenses={expenses}
+                    onUpdateSettings={handleSaveSettings}
                 />
             )}
             
@@ -288,18 +472,28 @@ const App: React.FC = () => {
                 />
             )}
 
+            {view === 'mpf' && (
+                <MetricHistory 
+                    data={data}
+                    title="MPF Portfolio"
+                    dataKey="mpf"
+                    color="#8b5cf6"
+                    onBack={() => setView('dashboard')}
+                />
+            )}
+
             {view === 'assets' && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                      <div className="flex justify-end">
                         <button 
                             onClick={() => {
                                 setEditingAsset(null);
                                 setView('add_asset');
                             }}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-emerald-200/50 w-full md:w-auto justify-center"
                         >
-                            <Plus size={16} />
-                            <span>Update Assets</span>
+                            <Plus size={18} />
+                            <span>Update Balances</span>
                         </button>
                      </div>
                     <TransactionTable 
@@ -325,7 +519,7 @@ const App: React.FC = () => {
             
             {view === 'add_asset' && (
                  <div className="max-w-4xl mx-auto">
-                    <button onClick={() => setView('assets')} className="mb-4 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1">← Back to Assets</button>
+                    <button onClick={() => setView('assets')} className="mb-4 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium">← Back to Assets</button>
                     <AddEntryForm 
                         onAdd={handleAddOrUpdateRecord} 
                         lastRecord={data[data.length - 1]} 
@@ -337,11 +531,12 @@ const App: React.FC = () => {
             
             {view === 'add_expense' && (
                  <div className="max-w-2xl mx-auto">
-                    <button onClick={() => setView('expenses')} className="mb-4 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1">← Back to Expenses</button>
+                    <button onClick={() => setView('expenses')} className="mb-4 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium">← Back to Expenses</button>
                     <AddExpenseForm 
                         onAdd={handleAddOrUpdateExpense} 
                         onCancel={() => setView('expenses')} 
                         initialData={editingExpense}
+                        settings={settings}
                     />
                  </div>
             )}
@@ -352,6 +547,8 @@ const App: React.FC = () => {
                     onSave={handleSaveSettings} 
                     data={data}
                     expenses={expenses}
+                    onLoadSampleData={handleLoadSampleData}
+                    onRestore={handleRestoreData}
                 />
             )}
           </div>

@@ -1,4 +1,4 @@
-import { FinanceRecord, ExpenseRecord } from '../types';
+import { FinanceRecord, ExpenseRecord, Account } from '../types';
 
 export const parseCurrency = (val: string | number | undefined | null): number => {
   if (!val) return 0;
@@ -14,24 +14,31 @@ export const formatCurrency = (val: number | undefined | null): string => {
   }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD', // Assuming $ symbol implies dollar (HKD/USD), using generic $ formatting
+    currency: 'USD',
     maximumFractionDigits: 0,
   }).format(val);
 };
 
 export const formatDate = (dateStr: string): string => {
   if (!dateStr) return 'N/A';
-  // Handle 2025/8/4 format
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-export const parseCSVData = (csv: string): FinanceRecord[] => {
+// Helper to sum values by account type
+export const getAccountTotal = (record: FinanceRecord, accounts: Account[], type: 'cash' | 'investment' | 'other'): number => {
+    return accounts
+        .filter(a => a.type === type)
+        .reduce((sum, acc) => sum + (record.values[acc.id] || 0), 0);
+};
+
+export const parseCSVData = (csv: string): any[] => {
+  // This is a legacy parser for the default hardcoded string in constants.ts
+  // It returns objects compatible with the OLD structure, which App.tsx will migrate.
   const lines = csv.split('\n');
-  const records: FinanceRecord[] = [];
+  const records: any[] = [];
   
-  // Skip header (index 0)
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
@@ -50,13 +57,12 @@ export const parseCSVData = (csv: string): FinanceRecord[] => {
         }
     }
     parts.push(current);
-
     const cleanParts = parts.map(p => p ? p.replace(/^"|"$/g, '').trim() : '');
 
-    // Basic validation to check if row has data
     if (!cleanParts[0] && parseCurrency(cleanParts[9]) === 0) continue;
 
-    const record: FinanceRecord = {
+    // Map legacy CSV columns to temporary structure
+    records.push({
       id: `rec-${i}-${Date.now()}`,
       date: cleanParts[0] || 'Unknown Date',
       cash: {
@@ -76,9 +82,7 @@ export const parseCSVData = (csv: string): FinanceRecord[] => {
       income: parseCurrency(cleanParts[11]),
       mpf: parseCurrency(cleanParts[12]),
       note: cleanParts[13]
-    };
-    
-    records.push(record);
+    });
   }
   return records;
 };
@@ -87,7 +91,6 @@ export const parseExpenseCSV = (csv: string): ExpenseRecord[] => {
   const lines = csv.split('\n');
   const records: ExpenseRecord[] = [];
   
-  // Skip header
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
@@ -95,9 +98,6 @@ export const parseExpenseCSV = (csv: string): ExpenseRecord[] => {
     const parts = line.split(',').map(p => p.trim());
     if (parts.length < 3) continue;
 
-    // OLD Format: Date, Category, Item, Amount, Note
-    // NEW Format: Category, Item, Amount, Note
-    // Check if first part looks like a date (simple check) to handle backward compatibility lightly
     const isDate = parts[0].includes('/') || parts[0].includes('-');
     const offset = isDate ? 1 : 0;
 

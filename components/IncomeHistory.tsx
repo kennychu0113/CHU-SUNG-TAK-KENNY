@@ -20,8 +20,10 @@ const IncomeHistory: React.FC<IncomeHistoryProps> = ({ data, onBack }) => {
     Income: d.income
   }));
 
+  const totalIncome = incomeData.reduce((sum, d) => sum + d.income, 0);
+
   const average = incomeData.length > 0 
-    ? incomeData.reduce((sum, d) => sum + d.income, 0) / incomeData.length 
+    ? totalIncome / incomeData.length 
     : 0;
 
   return (
@@ -67,8 +69,10 @@ const IncomeHistory: React.FC<IncomeHistoryProps> = ({ data, onBack }) => {
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h3 className="font-semibold text-slate-700">Detailed Records</h3>
-            <div className="text-sm text-slate-500">
-                Average: <span className="font-bold text-emerald-600">{formatCurrency(average)}</span>
+            <div className="text-sm text-slate-500 flex flex-col md:flex-row md:gap-4 text-right md:text-left">
+                <span>Total: <span className="font-bold text-slate-700">{formatCurrency(totalIncome)}</span></span>
+                <span className="hidden md:inline text-slate-300">|</span>
+                <span>Average: <span className="font-bold text-emerald-600">{formatCurrency(average)}</span></span>
             </div>
         </div>
         <div className="overflow-x-auto">

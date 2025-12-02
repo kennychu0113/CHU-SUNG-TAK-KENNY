@@ -1,23 +1,23 @@
+export type AccountType = 'cash' | 'investment' | 'other';
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+}
+
 export interface FinanceRecord {
   id: string;
   date: string;
-  cash: {
-    hsbc: number;
-    citi: number;
-    other: number;
-    total: number;
-  };
-  investment: {
-    sofi: number;
-    binance: number;
-    total: number;
-  };
-  yen: number;
-  totalAssets: number;
-  gain: number;
+  // Key is Account.id, value is amount
+  values: Record<string, number>;
   income: number;
   mpf: number;
   note?: string;
+  
+  // Computed helpers (Totals)
+  totalAssets: number;
+  gain: number;
 }
 
 export interface ExpenseRecord {
@@ -28,15 +28,24 @@ export interface ExpenseRecord {
   note?: string;
 }
 
-export interface AppSettings {
-  labels: {
-    hsbc: string;
-    citi: string;
-    other: string;
-    sofi: string;
-    binance: string;
-    yen: string;
-  }
+export interface SavingGoal {
+  amount: number;
+  months: number; // Duration in months
+  startDate: string;
 }
 
-export type ViewState = 'dashboard' | 'assets' | 'expenses' | 'add_asset' | 'add_expense' | 'settings' | 'income_history' | 'metric_history';
+export interface AppSettings {
+  accounts: Account[];
+  expenseCategories: string[];
+  savingGoal?: SavingGoal;
+}
+
+export type ViewState = 'dashboard' | 'assets' | 'expenses' | 'goals' | 'add_asset' | 'add_expense' | 'settings' | 'income_history' | 'metric_history' | 'mpf';
+
+export interface BackupData {
+  version: number;
+  timestamp: string;
+  assets: FinanceRecord[];
+  expenses: ExpenseRecord[];
+  settings: AppSettings;
+}
