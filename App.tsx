@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { INITIAL_CSV_DATA, INITIAL_EXPENSE_DATA } from './constants';
-import { parseCSVData, parseExpenseCSV } from './utils/helpers';
+import { parseExpenseCSV } from './utils/helpers';
 import { FinanceRecord, ExpenseRecord, ViewState, AppSettings, Account, BackupData } from './types';
 import Dashboard from './components/Dashboard';
 import TransactionTable from './components/TransactionTable';
@@ -11,7 +10,7 @@ import SettingsForm from './components/SettingsForm';
 import IncomeHistory from './components/IncomeHistory';
 import MetricHistory from './components/MetricHistory';
 import GoalPage from './components/GoalPage';
-import { LayoutDashboard, List, CreditCard, Menu, X, Plus, Settings, CheckCircle2, Briefcase, Target, User, MoreHorizontal, FileText } from 'lucide-react';
+import { LayoutDashboard, List, CreditCard, Briefcase, Target, MoreHorizontal, CheckCircle2, Settings, Plus } from 'lucide-react';
 
 const STORAGE_KEYS = {
   ASSETS: 'wealthtrack_assets',
@@ -20,16 +19,13 @@ const STORAGE_KEYS = {
   LAST_SAVED: 'wealthtrack_last_saved'
 };
 
-const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Utilities', 'Entertainment', 'Housing', 'Health', 'Other'];
+const DEFAULT_CATEGORIES = ['Housing', 'Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Other'];
 
-// Default accounts to map legacy data
+// Generic default accounts for a clean start
 const DEFAULT_ACCOUNTS: Account[] = [
-    { id: 'acc_hsbc', name: 'HSBC', type: 'cash' },
-    { id: 'acc_citi', name: 'Citi', type: 'cash' },
-    { id: 'acc_other', name: 'Other', type: 'cash' },
-    { id: 'acc_sofi', name: 'Sofi', type: 'investment' },
-    { id: 'acc_binance', name: 'Binance', type: 'investment' },
-    { id: 'acc_yen', name: 'Yen', type: 'other' }
+    { id: 'acc_bank_main', name: 'Main Bank', type: 'cash' },
+    { id: 'acc_savings', name: 'Savings', type: 'cash' },
+    { id: 'acc_invest', name: 'Investments', type: 'investment' }
 ];
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -44,26 +40,6 @@ const App: React.FC = () => {
       const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (stored) {
           const parsed = JSON.parse(stored);
-          // Migration for settings: if 'labels' exists but 'accounts' doesn't
-          if (parsed.labels && !parsed.accounts) {
-             const migratedAccounts: Account[] = [
-                 { id: 'acc_hsbc', name: parsed.labels.hsbc || 'HSBC', type: 'cash' },
-                 { id: 'acc_citi', name: parsed.labels.citi || 'Citi', type: 'cash' },
-                 { id: 'acc_other', name: parsed.labels.other || 'Other', type: 'cash' },
-                 { id: 'acc_sofi', name: parsed.labels.sofi || 'Sofi', type: 'investment' },
-                 { id: 'acc_binance', name: parsed.labels.binance || 'Binance', type: 'investment' },
-                 { id: 'acc_yen', name: parsed.labels.yen || 'Yen', type: 'other' }
-             ];
-             return {
-                 expenseCategories: parsed.expenseCategories || DEFAULT_CATEGORIES,
-                 accounts: migratedAccounts
-             };
-          }
-          // Migration for savingGoal: years -> months if using old data structure
-          if (parsed.savingGoal && parsed.savingGoal.years && !parsed.savingGoal.months) {
-             parsed.savingGoal.months = parsed.savingGoal.years * 12;
-          }
-
           return {
               ...DEFAULT_SETTINGS,
               ...parsed,
@@ -77,48 +53,28 @@ const App: React.FC = () => {
     }
   });
 
-  // Initialize Assets with Migration Logic
+  // Initialize Assets - Start Empty by Default
   const [data, setData] = useState<FinanceRecord[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.ASSETS);
-      let loadedData = stored ? JSON.parse(stored) : parseCSVData(INITIAL_CSV_DATA);
-      
-      // Perform Migration if data is in old format (has 'cash' property)
-      if (loadedData.length > 0 && loadedData[0].cash) {
-          console.log("Migrating legacy data to new format...");
-          loadedData = loadedData.map((r: any) => ({
-              id: r.id,
-              date: r.date,
-              values: {
-                  'acc_hsbc': r.cash.hsbc,
-                  'acc_citi': r.cash.citi,
-                  'acc_other': r.cash.other,
-                  'acc_sofi': r.investment.sofi,
-                  'acc_binance': r.investment.binance,
-                  'acc_yen': r.yen
-              },
-              income: r.income,
-              mpf: r.mpf,
-              note: r.note,
-              totalAssets: r.totalAssets,
-              gain: r.gain
-          }));
+      if (stored) {
+          return JSON.parse(stored);
       }
-      return loadedData;
+      return []; // Clean start
     } catch (e) {
       console.error("Failed to load assets from storage", e);
-      return []; // Return empty on error to be safe
+      return [];
     }
   });
 
-  // Initialize Expenses
+  // Initialize Expenses - Start Empty by Default
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.EXPENSES);
-      return stored ? JSON.parse(stored) : parseExpenseCSV(INITIAL_EXPENSE_DATA);
+      return stored ? JSON.parse(stored) : []; // Clean start
     } catch (e) {
       console.error("Failed to load expenses from storage", e);
-      return parseExpenseCSV(INITIAL_EXPENSE_DATA);
+      return [];
     }
   });
 
@@ -128,7 +84,7 @@ const App: React.FC = () => {
   });
 
   const [view, setView] = useState<ViewState>('dashboard');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Used for the "More" tab
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<FinanceRecord | null>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
   
@@ -235,35 +191,48 @@ const App: React.FC = () => {
   };
 
   const handleLoadSampleData = () => {
-    if (window.confirm("This will overwrite your current data with sample data. Continue?")) {
-        // Reset to default accounts first to match CSV structure
+    if (window.confirm("This will overwrite your current data with sample demo data. Continue?")) {
+        // Reset to default generic accounts
         const defaultSet = { ...settings, accounts: DEFAULT_ACCOUNTS };
         setSettings(defaultSet);
         
-        // Parse and migrate fresh sample data
-        let sampleData = parseCSVData(INITIAL_CSV_DATA);
-        if (sampleData.length > 0 && sampleData[0].cash) {
-             sampleData = sampleData.map((r: any) => ({
-              id: r.id,
-              date: r.date,
-              values: {
-                  'acc_hsbc': r.cash.hsbc,
-                  'acc_citi': r.cash.citi,
-                  'acc_other': r.cash.other,
-                  'acc_sofi': r.investment.sofi,
-                  'acc_binance': r.investment.binance,
-                  'acc_yen': r.yen
-              },
-              income: r.income,
-              mpf: r.mpf,
-              note: r.note,
-              totalAssets: r.totalAssets,
-              gain: r.gain
-          }));
+        // Generate Generic Sample Data
+        const today = new Date();
+        const sampleRecords: FinanceRecord[] = [];
+        
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today);
+            d.setMonth(d.getMonth() - i);
+            const dateStr = d.toISOString().split('T')[0].replace(/-/g, '/');
+            
+            // Simulating growth
+            const baseWealth = 50000 + (5 - i) * 5000; 
+            
+            sampleRecords.push({
+                id: `demo-${i}`,
+                date: dateStr,
+                values: {
+                    'acc_bank_main': baseWealth * 0.4,
+                    'acc_savings': baseWealth * 0.2,
+                    'acc_invest': baseWealth * 0.4
+                },
+                totalAssets: baseWealth,
+                gain: i === 5 ? 0 : 5000,
+                income: 5000,
+                mpf: 2000 + (5-i)*200,
+                note: i === 0 ? 'Current Month' : ''
+            });
         }
 
-        setData(sampleData);
-        setExpenses(parseExpenseCSV(INITIAL_EXPENSE_DATA));
+        const sampleExpenses: ExpenseRecord[] = [
+            { id: 'demo-exp-1', category: 'Housing', item: 'Rent', amount: 1500, note: 'Monthly' },
+            { id: 'demo-exp-2', category: 'Food', item: 'Groceries', amount: 600, note: 'Estimate' },
+            { id: 'demo-exp-3', category: 'Transport', item: 'Commute', amount: 150, note: '' },
+            { id: 'demo-exp-4', category: 'Utilities', item: 'Internet & Phone', amount: 80, note: '' },
+        ];
+
+        setData(sampleRecords);
+        setExpenses(sampleExpenses);
         alert("Sample data loaded! Redirecting to dashboard...");
         setView('dashboard');
     }
