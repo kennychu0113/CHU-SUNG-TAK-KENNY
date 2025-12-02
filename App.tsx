@@ -33,6 +33,19 @@ const DEFAULT_SETTINGS: AppSettings = {
   expenseCategories: DEFAULT_CATEGORIES
 };
 
+// Helper to sort records by date and recalculate gains based on chronological order
+const recalculateGains = (records: FinanceRecord[]): FinanceRecord[] => {
+  // Sort by date ascending
+  const sorted = [...records].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  return sorted.map((record, index) => {
+    const prev = index > 0 ? sorted[index - 1] : null;
+    // Calculate gain vs previous record in time
+    const newGain = prev ? record.totalAssets - prev.totalAssets : 0;
+    return { ...record, gain: newGain };
+  });
+};
+
 const App: React.FC = () => {
   // Initialize Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -115,11 +128,15 @@ const App: React.FC = () => {
 
   const handleAddOrUpdateRecord = (record: FinanceRecord) => {
     setData(prev => {
+        let updatedList;
         const exists = prev.some(r => r.id === record.id);
         if (exists) {
-            return prev.map(r => r.id === record.id ? record : r);
+            updatedList = prev.map(r => r.id === record.id ? record : r);
+        } else {
+            updatedList = [...prev, record];
         }
-        return [...prev, record];
+        // Always resort and recalculate gains to ensure consistency
+        return recalculateGains(updatedList);
     });
     setEditingAsset(null);
     setView('assets');
@@ -139,7 +156,10 @@ const App: React.FC = () => {
 
   const handleDeleteRecord = (id: string) => {
     if (window.confirm('Are you sure you want to delete this asset record?')) {
-      setData(prev => prev.filter(record => record.id !== id));
+      setData(prev => {
+          const filtered = prev.filter(record => record.id !== id);
+          return recalculateGains(filtered);
+      });
     }
   };
 
@@ -169,7 +189,8 @@ const App: React.FC = () => {
   const handleRestoreData = (backup: BackupData) => {
     try {
         if (backup.settings) setSettings(backup.settings);
-        if (backup.assets) setData(backup.assets);
+        // Recalculate gains on restore just in case
+        if (backup.assets) setData(recalculateGains(backup.assets));
         if (backup.expenses) setExpenses(backup.expenses);
         alert(`Data restored successfully from ${new Date(backup.timestamp).toLocaleDateString()}!`);
     } catch (e) {
@@ -231,7 +252,8 @@ const App: React.FC = () => {
             { id: 'demo-exp-4', category: 'Utilities', item: 'Internet & Phone', amount: 80, note: '' },
         ];
 
-        setData(sampleRecords);
+        // Use recalculateGains to ensure sample data is perfectly consistent
+        setData(recalculateGains(sampleRecords));
         setExpenses(sampleExpenses);
         alert("Sample data loaded! Redirecting to dashboard...");
         setView('dashboard');
